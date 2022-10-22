@@ -1,59 +1,50 @@
 const express = require('express')
-const shortId = require('shortid')
-const createHttpError = require("http-errors")
-const mongoose = require('mongoose')
 const path = require('path')
-const { NOTFOUND } = require('dns')
-const { symlinkSync } = require('fs')
+var validUrl = require('valid-url')
 
 const app = express()
+
 app.use(express.static(path.join(__dirname,"public")))
 app.use(express.json())
 app.use(express.urlencoded({extended:false}))
+app.set('view engine', 'ejs')
 
+//veri tabanını simüle etmek için url ve kısaltılmış halini tutacağımız sınıf şablonu oluşturuldu
 class Urldb {
    longUrl = ""
    shortUrl =""
     constructor(longUrl, shortUrl){
         this.longUrl = longUrl;
-        
         this.shortUrl = shortUrl;
     }
-
 }
 
-function generateRandomUrl(){
-    const characters ='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
-
-    let result = '';
-    const charactersLength = characters.length;
-    for ( let i = 0; i < 6; i++ ) {
-        result += characters.charAt(Math.floor(Math.random() * charactersLength));
-    }
-
-    return result;
-
-}
-
+// veri tabanını simüle etmek için urlDb tipinde veriler tutacak dizi oluşturuldu
 var array = []
-const dene = new Urldb("birinci","birinci");
+const dene = new Urldb("birinci denemek için atıldı","birinci");
 array.push(dene)
 
 
 
 
 
-app.set('view engine', 'ejs')
 
+//index sayfasını döndürüyor.
 app.get('/', async (req,res,next) => {
      res.render('index')
 })
 
+
 app.post('/',  async (req, res, next) => {
-  var deger = await  isExistUrl(req.body.url);
-  console.log(deger)
-  if(deger === 0){
+  
+    //url geçerli mi kontrol ediliyor.
+  if( validUrl.isUri(req.body.url)){
+     
+    // url daha önce var mı kontrol ediliyor.
+     var deger = await  isExistUrl(req.body.url);
+     console.log(deger)
+     if(deger === 0){
      var shortUrl = await generateRandomUrl();
      var longUrl  = req.body.url;
      var newUrl = new Urldb(longUrl,shortUrl);
@@ -61,16 +52,25 @@ app.post('/',  async (req, res, next) => {
       res.send("http://localhost:3000/"+shortUrl)
       console.log(array)
   }else{
-    res.send("geçersiz url")
+        res.status(409).send("Url already exists")
+    }
+  }else{
+    res.status(422).send("Url is not valid")
   }
+  
 })
 
+// girilen kısa url ile yönlendirme yapılıyor.
 app.get("/:shortUrl", async (req, res, next) => {
      const {shortUrl} = req.params;
      const resultUrl = await findLongUrlForShortUrl(shortUrl)
      res.redirect(resultUrl)
 })
 
+app.listen(3000, () => console.log("on port 3000..."))
+
+
+//girilen url veritabanında daha önce eklenmiş mi kontrol ediliyor.
 async function isExistUrl(url){
     var deger = 0;
     console.log(url)
@@ -85,8 +85,8 @@ async function isExistUrl(url){
     
 }
 
+//girilen kısa url veri tabanında olup olmadığı kontrolü yapılıyor.
 async function findLongUrlForShortUrl(shortUrl){
-    
     var url;
     for(i = 0; i<array.length; i++){
         if(array[i].shortUrl == shortUrl){
@@ -97,5 +97,13 @@ async function findLongUrlForShortUrl(shortUrl){
 }
 
 
-
-app.listen(3000, () => console.log("on port 3000..."))
+// gelen url'i kısaltmak için random 6 karakterlik bir url belirleniyor.
+function generateRandomUrl(){
+    const characters ='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    const charactersLength = characters.length;
+    for ( let i = 0; i < 6; i++ ) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}
